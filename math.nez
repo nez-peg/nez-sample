@@ -1,21 +1,24 @@
 /**
  * math.nez
- * basic mathematical operator 
- * author: Kimio Kuramitsu
+ * Basic mathematical operators 
+ * author: Kimio Kuramitsu https://github.com/kkuramitsu
  */
 
-File
-	= Expr .*
+/* starting position */
+
+File  = Expr .*
+Chunk = Expr
+
+/* public rules */
 
 example Expr 1
-example Expr 1+A*3
+example Expr 1+2*3
 
 example Expr '''
 1*2+3
 '''
 
-public Expr
-	= Sum
+public Expr = Sum
 
 Sum
 	= Product {@ ( '+' #Add / '-' #Sub ) @Product }*
