@@ -28,10 +28,14 @@ __
   = (S / NEWLINE / '\\' NEWLINE / '#' (!'\n' .)*)*
 
 ___
-  = (S / '\\' NEWLINE/ '#' (!'\n' .)*)*
+  = (S / '\\' NEWLINE/ COMMENT )*
 
 ____
-	= (S / NEWLINE / '\\' NEWLINE / '#' (!'\n' .)*)+
+	= (S / NEWLINE / '\\' NEWLINE / COMMENT)+
+
+
+COMMENT
+	= '#' (!'\n' .)*
 
 EOS
   = ';'
@@ -41,9 +45,16 @@ EOS
 EOF
   = !.
 
+
+
 // ====================
-//      Def
+// Def
 // ====================
+
+example FuncDef '''
+def f() :
+	pass
+'''
 
 FuncDef
   = {'def' ___ @Name ___ @Parameters @{(_ '->' _ @Test)? #Arrow} ___ ':' ___ @Suite #Function }
