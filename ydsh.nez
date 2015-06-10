@@ -1,0 +1,414 @@
+
+// ##############################
+// ##     lexer definition     ##
+// ##############################
+
+W = [0-9a-zA-Z_]+
+
+// lexical segment
+NUM = '0' / [1-9] [0-9]*
+INT = [+-]? NUM
+DIGITS = [0-9]+
+FLOAT_SUFFIX =  [eE] [+-]? NUM
+FLOAT = INT '.' DIGITS FLOAT_SUFFIX?
+
+SQUOTE_CHAR = ![\r\n'\\] . / '\\' [btnfr'\\]
+
+VAR_NAME = [_a-zA-Z] [_0-9a-zA-Z]*
+SPECIAL_NAMES = [@0?]
+PATH_CHARS = '/' / ('/' [_a-zA-Z0-9]+ )+
+CMD_START_CHAR = '\\' ![\r\n] . / ![ \t\r\n;'"`|&<>(){}$#![\]0-9] .
+CMD_CHAR       = '\\' . / '\\' [\r\n] / ![ \t\r\n;'"`|&<>(){}$#![\]] .
+
+
+
+// statement key word
+ASSERT      = 'assert'      !W
+BREAK       = 'break'       !W
+CATCH       = 'catch'       !W
+CLASS       = 'class'       !W
+CONTINUE    = 'continue'    !W
+DO          = 'do'          !W
+ELIF        = 'elif'        !W
+ELSE        = 'else'        !W
+EXTENDS     = 'extends'     !W
+EXPORT_ENV  = 'export-env'  !W
+FINALLY     = 'finally'     !W
+FOR         = 'for'         !W
+FUNCTION    = 'function'    !W
+IF          = 'if'          !W
+IMPORT_ENV  = 'import-env'  !W
+INTERFACE   = 'interface'   !W
+LET         = 'let'         !W
+NEW         = 'new'         !W
+NOT         = 'not'         !W
+RETURN      = 'return'      !W
+TRY         = 'try'         !W
+THROW       = 'throw'       !W
+TYPE_ALIAS  = 'type-alias'  !W
+VAR         = 'var'         !W
+WHILE       = 'while'       !W
+
+PLUS        = '+' ![+=]
+MINUS       = '-' ![-=]
+
+// literal
+INT_LITERAL    = INT
+BYTE_LITERAL   = INT 'b'
+INT16_LITERAL  = INT 'i16'
+INT32_LITERAL  = INT 'i32'
+INT64_LITERAL  = INT 'i64'
+UINT16_LITERAL = INT 'u16'
+UINT32_LITERAL = INT 'u32'
+UINT64_LITERAL = INT 'u64'
+
+FLOAT_LITERAL = FLOAT
+
+STRING_LITERAL = ['] SQUOTE_CHAR* [']
+
+PATH_LITERAL = 'p' ['] PATH_CHARS [']
+
+OPEN_DQUOTE = ["]
+CLOSE_DQUOTE = ["]
+
+BQUOTE_LITERAL = [`] ('\\' '`' / ![\n\r] . )+ [`]
+
+START_SUB_CMD = '$('
+
+APPLIED_NAME = '$' VAR_NAME
+SPECIAL_NAME = '$' SPECIAL_NAMES
+
+LP = '('
+RP = ')'
+LB = '['
+RB = ']'
+LBC = '{'
+RBC = '}'
+
+COMMAND = CMD_START_CHAR CMD_CHAR*
+
+COLON = ':'
+COMMA = ','
+
+MUL = '*' !'='
+DIV = '/' !'='
+MOD = '%' !'='
+LA = '<' !'='
+RA = '>' !'='
+LE = '<='
+GE = '>='
+EQ = '=='
+NE = '!='
+AND = '&' !'&'
+OR = '|' !'|'
+XOR = '^'
+COND_AND = '&&'
+COND_OR = '||'
+RE_MATCH = '=~'
+RE_UNMATCH = '!~'
+
+INC = '++'
+DEC = '--'
+
+ASSIGN = '=' ![~=]
+ADD_ASSIGN = '+='
+SUB_ASSIGN = '-='
+MUL_ASSIGN = '*='
+DIV_ASSIGN = '/='
+MOD_ASSIGN = '%='
+
+AS = 'as' !W
+FUNC = 'Func' !W
+IN = 'in' !W
+IS = 'is' !W
+
+IDENTIFIER = VAR_NAME
+
+ACCESSOR = '.'
+
+LINE_END = ';'
+NEW_LINE = [\r\n][ \t\r\n]*
+COMMENT = '#' (![\r\n] .)*
+WHITE_SPACE = [ \t]+
+ESCAPE_NEW_LINE = '\\' [\r\n]
+
+OTHER = . / [\r\n]
+
+STR_ELEMENT = (![\r\n`$"\\] . / '\\' [$btnfr"`\\])+
+
+INNER_NAME = APPLIED_NAME / '${' VAR_NAME '}'
+INNER_SPECIAL_NAME = SPECIAL_NAME / '${' SPECIAL_NAMES '}'
+
+START_INTERP = '${'
+
+CMD_ARG_PART = CMD_CHAR+
+
+REDIR_IN_2_FILE = '<'
+REDIR_OUT_2_FILE = '>' ![>&] / '1>' ![>&]
+REDIR_OUT_2_FILE_APPEND = '>>' / '1>>'
+REDIR_ERR_2_FILE = '2>' ![>&]
+REDIR_ERR_2_FILE_APPEND = '2>>'
+REDIR_MERGE_ERR_2_OUT_2_FILE = '&>' / '>&'
+REDIR_MERGE_ERR_2_OUT_2_FILE_APPEND = '&>>'
+REDIR_MERGE_ERR_2_OUT = '2>&1'
+
+CMD_SEP = [ \t]+
+PIPE = '|' !'|'
+BACKGROUND = '&' !'&'
+OR_LIST = '||'
+AND_LIST = '&&'
+
+TYPE_PATH = VAR_NAME ('.' VAR_NAME)+
+
+// ###############################
+// ##     parser definition     ##
+// ###############################
+
+EOF
+	= !.
+
+__WS
+	= WHITE_SPACE / ESCAPE_NEW_LINE / COMMENT
+
+WS
+	= __WS*
+_
+	= (__WS / NEW_LINE)*
+
+
+// entry point
+File
+	= TopLevel
+
+Chunk
+	= TopLevelStatement?
+
+TopLevel
+	= (_ TopLevelStatement)* _
+
+TopLevelStatement
+	= Function
+	/ Interface
+	/ TypeAlias
+	/ Statement
+
+Function
+	= FuncDecl Block
+
+FuncDecl
+	= FUNCTION _ IDENTIFIER  _ LP _
+		(FuncParam (WS COMMA _ FuncParam)* )?
+		_ RP
+		(WS COLON ReturnType)?
+
+FuncParam
+	= APPLIED_NAME WS COLON TypeName
+
+ReturnType
+	= TypeName (_ TypeName)*
+
+Interface
+	= INTERFACE _ TYPE_PATH _ LBC _
+		((VAR / LET) _ IDENTIFIER _ COLON _ TypeName  _ STATEMENT_END
+		/ FuncDecl _ STATEMENT_END)+
+
+TypeAlias
+	= TYPE_ALIAS _ IDENTIFIER _ TypeName
+
+TypeName
+	= IDENTIFIER (WS '<' _ TypeName ( _ ',' _ TypeName )* _ '>')?
+	/ FUNC WS '<' _ TypeName _ ('[' _ TypeName (_ ',' _ TypeName)* _ ']')? '>'
+	/ TYPE_PATH
+
+Statement
+	= LINE_END
+	/ ASSERT _ LP _ CommandOrExpression _ RP _ STATEMENT_END
+	/ BREAK STATEMENT_END
+	/ CONTINUE STATEMENT_END
+	/ EXPORT_ENV _ IDENTIFIER WS ASSIGN Expression STATEMENT_END
+	/ ForStatement
+	/ IF _ LP _ CommandOrExpression _ RP Block
+		(ELIF _ LP _ CommandOrExpression _ RP Block)*
+		(ELSE Block)?
+	/ IMPORT_ENV _ IDENTIFIER _ STATEMENT_END
+	/ RETURN (WS Expression)? STATEMENT_END
+	/ THROW _ Expression STATEMENT_END
+	/ WHILE _ LP _ CommandOrExpression _ RP Block
+	/ DO Block WHILE _ LP _ CommandOrExpression _ RP STATEMENT_END
+	/ TRY Block (_ CatchStatement)* (FINALLY Block)?
+	/ VariableDeclaration STATEMENT_END
+	/ CommandListExpression STATEMENT_END
+	/ Expression STATEMENT_END
+
+STATEMENT_END
+	= WS (EOF / LINE_END / NEW_LINE)
+
+Block
+	= _ LBC (_ Statement)+ _ RBC _
+
+VariableDeclaration
+	= (VAR / LET) _ IDENTIFIER WS ASSIGN _ CommandOrExpression
+
+ForStatement
+	= FOR _ LP _ ForInit _ LINE_END _ ForCond _ LINE_END _ ForIter _ RP Block
+	/ FOR _ LP _ APPLIED_NAME WS IN _ Expression _ RP Block
+
+ForInit
+	= (VariableDeclaration / Expression)?
+
+ForCond
+	= CommandOrExpression?
+
+ForIter
+	= Expression?
+
+CatchStatement
+	= CATCH _ LP _ APPLIED_NAME	(WS COLON _ TypeName) _ RP Block
+
+CommandListExpression
+	= OrListCommand
+
+OrListCommand
+	= AndListCommand (CMD_SEP? OR_LIST _ AndListCommand)*
+
+AndListCommand
+	= PipedCommand (CMD_SEP? AND_LIST _ PipedCommand)*
+
+PipedCommand
+	= Command (CMD_SEP? PIPE _ Command)*
+
+Command
+	= COMMAND (CMD_SEP (CmdArg / RedirOption))*
+
+RedirOption
+	= (REDIR_IN_2_FILE
+		/ REDIR_OUT_2_FILE
+		/ REDIR_OUT_2_FILE_APPEND
+		/ REDIR_ERR_2_FILE
+		/ REDIR_ERR_2_FILE_APPEND
+		/ REDIR_MERGE_ERR_2_OUT_2_FILE
+		/ REDIR_MERGE_ERR_2_OUT_2_FILE_APPEND) CMD_SEP?
+		CmdArg
+	/ REDIR_MERGE_ERR_2_OUT
+
+CmdArg
+	= CmdArgSeg+
+
+CmdArgSeg
+	= CMD_ARG_PART
+	/ StringLiteral
+	/ StringExpression
+	/ CommandSubstitution
+	/ Interpolation
+
+// expression
+CommandOrExpression
+	= CommandListExpression / Expression
+
+Expression
+	= AssignExpression
+
+AssignExpression
+	= CondOrExpression
+		(WS (ASSIGN / ADD_ASSIGN / SUB_ASSIGN / MUL_ASSIGN / DIV_ASSIGN / MOD_ASSIGN)
+			_ CondOrExpression)*
+
+CondOrExpression
+	= CondAndExpression
+		(WS COND_OR _ CondAndExpression)*
+
+CondAndExpression
+	= OrExpression
+		(WS COND_AND _ OrExpression)*
+
+OrExpression
+	= XorExpression
+		(WS OR _ XorExpression)*
+
+XorExpression
+	= AndExpression
+		(WS XOR _ AndExpression)*
+
+AndExpression
+	= EqualityExpression
+		(WS AND _ EqualityExpression)*
+
+EqualityExpression
+	= TypeExpression
+		(WS (EQ / NE / RE_MATCH / RE_UNMATCH) _ TypeExpression)*
+
+TypeExpression
+	= RelationalExpression
+		(WS (AS / IS) _ TypeName)*
+
+RelationalExpression
+	= AddExpression
+		(WS (LA / RA / LE / GE) _ AddExpression)*
+
+AddExpression
+	= MulExpression
+		(WS (PLUS / MINUS) _ MulExpression)*
+
+MulExpression
+	= UnaryExpression
+		(WS (MUL / DIV / MOD) _ UnaryExpression)*
+
+UnaryExpression
+	= (PLUS / MINUS / NOT) _ UnaryExpression
+	/ SuffixExpression
+
+SuffixExpression
+	= MemberExpression (INC / DEC)?
+
+MemberExpression
+	= PrimaryExpression
+		( _ (ACCESSOR WS IDENTIFIER / LB _ Expression _ RB / Arguments))*
+
+PrimaryExpression
+	= NEW _ TypeName _ Arguments
+	/ INT_LITERAL
+	/ BYTE_LITERAL
+	/ INT16_LITERAL
+	/ UINT16_LITERAL
+	/ INT32_LITERAL
+	/ UINT32_LITERAL
+	/ INT64_LITERAL
+	/ UINT64_LITERAL
+	/ FLOAT_LITERAL
+	/ StringLiteral
+	/ PATH_LITERAL
+	/ StringExpression
+	/ CommandSubstitution
+	/ AppliedName
+	/ SpecialName
+	/ LP _ Expression _ RP
+	/ LP _ Expression (_ COMMA _ Expression)+ _ RP
+	/ LB _ Expression (_ COMMA _ Expression)* _ RB
+	/ LBC _ MapEntry (_ COMMA _ MapEntry)* _ RBC
+
+MapEntry
+	= Expression WS COLON WS Expression
+
+AppliedName
+	= APPLIED_NAME
+
+SpecialName
+	= SPECIAL_NAME
+
+StringLiteral
+	= STRING_LITERAL
+
+Arguments
+	= LP (_ Expression ( _ COMMA _ Expression)*)? _ RP
+
+StringExpression
+	= OPEN_DQUOTE
+		(STR_ELEMENT / Interpolation / CommandSubstitution)* CLOSE_DQUOTE
+
+Interpolation
+	= AppliedName
+	/ SpecialName
+	/ START_INTERP Expression RBC
+
+CommandSubstitution
+	= START_SUB_CMD CommandListExpression RP
