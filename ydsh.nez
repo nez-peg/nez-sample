@@ -180,11 +180,8 @@ _
 File
 	= TopLevel
 
-Chunk
-	= TopLevelStatement?
-
 TopLevel
-	= (_ TopLevelStatement)* _
+	= { (_ @TopLevelStatement)* _ #Root }
 
 TopLevelStatement
 	= Function
@@ -193,49 +190,54 @@ TopLevelStatement
 	/ Statement
 
 Function
-	= FuncDecl Block
+	= { @FuncDecl @Block #Function }
 
 FuncDecl
-	= FUNCTION _ IDENTIFIER  _ LP _
-		(FuncParam (WS COMMA _ FuncParam)* )?
+	= { FUNCTION _ @{IDENTIFIER #Name }  _ LP _
+		(@FuncParam (WS COMMA _ @FuncParam)* )?
 		_ RP
-		(WS COLON ReturnType)?
+		(WS COLON @ReturnType)? #FuncDecl }
 
 FuncParam
-	= APPLIED_NAME WS COLON TypeName
+	= { @{APPLIED_NAME #ParamName } WS COLON @TypeName #Param }
 
 ReturnType
-	= TypeName (_ TypeName)*
+	= { @TypeName (_ @TypeName)* #ReturnType }
 
 Interface
-	= INTERFACE _ TYPE_PATH _ LBC _
-		((VAR / LET) _ IDENTIFIER _ COLON _ TypeName  _ STATEMENT_END
-		/ FuncDecl _ STATEMENT_END)+
+	= { INTERFACE _ @{TYPE_PATH #Name } _ LBC _
+		( @PropertyDecl _ STATEMENT_END
+		/ @FuncDecl _ STATEMENT_END)+
+		#Interface }
+
+PropertyDecl
+	= { @{(VAR / LET) #AccessLevel} _ @{IDENTIFIER #VarName } _ COLON _ @TypeName #VarDecl }
 
 TypeAlias
-	= TYPE_ALIAS _ IDENTIFIER _ TypeName
+	= { TYPE_ALIAS _ @{IDENTIFIER #Name } _ @TypeName #TypeAlias }
 
 TypeName
-	= IDENTIFIER (WS '<' _ TypeName ( _ ',' _ TypeName )* _ '>')?
-	/ FUNC WS '<' _ TypeName _ ('[' _ TypeName (_ ',' _ TypeName)* _ ']')? '>'
-	/ TYPE_PATH
+	= { @{IDENTIFIER #TemplateName } WS '<' _ @TypeName ( _ ',' _ @TypeName )* _ '>' #ReifiedType }
+	/ { IDENTIFIER #ClassType }
+	/ { FUNC WS '<' _ @TypeName _ ( @{'[' _ @TypeName (_ ',' _ @TypeName)* _ ']' #ParamTypes })? '>' #FuncType }
+	/ { TYPE_PATH #IfaceType }
 
 Statement
-	= LINE_END
-	/ ASSERT _ LP _ CommandOrExpression _ RP _ STATEMENT_END
-	/ BREAK STATEMENT_END
-	/ CONTINUE STATEMENT_END
-	/ EXPORT_ENV _ IDENTIFIER WS ASSIGN Expression STATEMENT_END
+	= { #Empty LINE_END }
+	/ { ASSERT _ LP _ @CommandOrExpression _ RP _ STATEMENT_END #Assert }
+	/ { BREAK STATEMENT_END #Break }
+	/ { CONTINUE STATEMENT_END #Continue }
+	/ { EXPORT_ENV _ @{IDENTIFIER #EnvName } WS ASSIGN @Expression STATEMENT_END #ExportEnv}
 	/ ForStatement
-	/ IF _ LP _ CommandOrExpression _ RP Block
-		(ELIF _ LP _ CommandOrExpression _ RP Block)*
-		(ELSE Block)?
-	/ IMPORT_ENV _ IDENTIFIER _ STATEMENT_END
-	/ RETURN (WS Expression)? STATEMENT_END
-	/ THROW _ Expression STATEMENT_END
-	/ WHILE _ LP _ CommandOrExpression _ RP Block
-	/ DO Block WHILE _ LP _ CommandOrExpression _ RP STATEMENT_END
-	/ TRY Block (_ CatchStatement)* (FINALLY Block)?
+	/ { IF _ LP _ @CommandOrExpression _ RP @Block
+		( @{ ELIF _ LP _ @CommandOrExpression _ RP @Block #Elif })*
+		(  @{ ELSE @Block #Else })? #If }
+	/ { IMPORT_ENV _ @{IDENTIFIER #EnvName } _ STATEMENT_END #ImportEnv }
+	/ { RETURN (WS @Expression)? STATEMENT_END #Return }
+	/ { THROW _ @Expression STATEMENT_END #Throw }
+	/ { WHILE _ LP _ @CommandOrExpression _ RP @Block #While }
+	/ { DO @Block WHILE _ LP _ @CommandOrExpression _ RP STATEMENT_END #DoWhile }
+	/ { TRY @Block (_ @CatchStatement)* (FINALLY @Block)? }
 	/ VariableDeclaration STATEMENT_END
 	/ CommandListExpression STATEMENT_END
 	/ Expression STATEMENT_END
@@ -244,14 +246,14 @@ STATEMENT_END
 	= WS (EOF / LINE_END / NEW_LINE)
 
 Block
-	= _ LBC (_ Statement)+ _ RBC _
+	= _ LBC { (_ @Statement)+ #Block } _ RBC _
 
 VariableDeclaration
-	= (VAR / LET) _ IDENTIFIER WS ASSIGN _ CommandOrExpression
+	= { @{ (VAR / LET) #AccessLevel} _ @{ IDENTIFIER #VarName } WS ASSIGN _ @CommandOrExpression #VarDecl }
 
 ForStatement
-	= FOR _ LP _ ForInit _ LINE_END _ ForCond _ LINE_END _ ForIter _ RP Block
-	/ FOR _ LP _ APPLIED_NAME WS IN _ Expression _ RP Block
+	= { FOR _ LP _ @ForInit _ LINE_END _ @ForCond _ LINE_END _ @ForIter _ RP @Block #For }
+	/ { FOR _ LP _ @{ APPLIED_NAME #VarName } WS IN _ @Expression _ RP @Block #ForIn }
 
 ForInit
 	= (VariableDeclaration / Expression)?
@@ -263,39 +265,39 @@ ForIter
 	= Expression?
 
 CatchStatement
-	= CATCH _ LP _ APPLIED_NAME	(WS COLON _ TypeName) _ RP Block
+	= { CATCH _ LP _ @{ APPLIED_NAME #ExceptionName } (WS COLON _ @TypeName) _ RP @Block #Catch }
 
 CommandListExpression
 	= OrListCommand
 
 OrListCommand
-	= AndListCommand (CMD_SEP? OR_LIST _ AndListCommand)*
+	= AndListCommand {@ CMD_SEP? OR_LIST _ @AndListCommand #ConsOr }*
 
 AndListCommand
-	= PipedCommand (CMD_SEP? AND_LIST _ PipedCommand)*
+	= PipedCommand {@ CMD_SEP? AND_LIST _ @PipedCommand #CondAnd }*
 
 PipedCommand
-	= Command (CMD_SEP? PIPE _ Command)*
+	= { @Command (CMD_SEP? PIPE _ @Command)* #PipedCommand }
 
 Command
-	= COMMAND (CMD_SEP (CmdArg / RedirOption))*
+	= { @{ COMMAND #CommandName } (CMD_SEP (@CmdArg / @RedirOption))* #Command }
 
 RedirOption
-	= (REDIR_IN_2_FILE
+	= { @{(REDIR_IN_2_FILE
 		/ REDIR_OUT_2_FILE
 		/ REDIR_OUT_2_FILE_APPEND
 		/ REDIR_ERR_2_FILE
 		/ REDIR_ERR_2_FILE_APPEND
 		/ REDIR_MERGE_ERR_2_OUT_2_FILE
-		/ REDIR_MERGE_ERR_2_OUT_2_FILE_APPEND) CMD_SEP?
-		CmdArg
-	/ REDIR_MERGE_ERR_2_OUT
+		/ REDIR_MERGE_ERR_2_OUT_2_FILE_APPEND) #RedirOp } CMD_SEP?
+		@CmdArg
+	/ @{ REDIR_MERGE_ERR_2_OUT #RedirOp } #RedirOption }
 
 CmdArg
-	= CmdArgSeg+
+	= { (@CmdArgSeg)+ #CmdArg }
 
 CmdArgSeg
-	= CMD_ARG_PART
+	= { CMD_ARG_PART #CmdArgPart }
 	/ StringLiteral
 	/ StringExpression
 	/ CommandSubstitution
@@ -310,105 +312,131 @@ Expression
 
 AssignExpression
 	= CondOrExpression
-		(WS (ASSIGN / ADD_ASSIGN / SUB_ASSIGN / MUL_ASSIGN / DIV_ASSIGN / MOD_ASSIGN)
-			_ CondOrExpression)*
+		{@ WS @AssignOp _ @CondOrExpression #Assign }*
+
+AssignOp
+	= {(ASSIGN / ADD_ASSIGN / SUB_ASSIGN / MUL_ASSIGN / DIV_ASSIGN / MOD_ASSIGN) #Operator }
 
 CondOrExpression
 	= CondAndExpression
-		(WS COND_OR _ CondAndExpression)*
+		{@ WS COND_OR _ @CondAndExpression #CondOr }*
 
 CondAndExpression
 	= OrExpression
-		(WS COND_AND _ OrExpression)*
+		{@ WS COND_AND _ @OrExpression #CondAnd }*
 
 OrExpression
 	= XorExpression
-		(WS OR _ XorExpression)*
+		{@ WS @{ OR #Operator } _ @XorExpression #BinaryOp }*
 
 XorExpression
 	= AndExpression
-		(WS XOR _ AndExpression)*
+		{@ WS @{ XOR #Operator } _ @AndExpression #BinaryOp }*
 
 AndExpression
 	= EqualityExpression
-		(WS AND _ EqualityExpression)*
+		{@ WS @{ AND #Operator } _ @EqualityExpression #BinaryOp }*
 
 EqualityExpression
 	= TypeExpression
-		(WS (EQ / NE / RE_MATCH / RE_UNMATCH) _ TypeExpression)*
+		{@ WS @EqualityOp _ @TypeExpression #BinaryOp }*
+
+EqualityOp
+	= {(EQ / NE / RE_MATCH / RE_UNMATCH) #Operator }
 
 TypeExpression
 	= RelationalExpression
-		(WS (AS / IS) _ TypeName)*
+		{@ WS (AS #Cast / IS #InstanceOf) _ @TypeName }*
 
 RelationalExpression
 	= AddExpression
-		(WS (LA / RA / LE / GE) _ AddExpression)*
+		{@ WS @RelationalOp _ @AddExpression #BinaryOp }*
+
+RelationalOp
+	= {(LA / RA / LE / GE) #Operator }
 
 AddExpression
 	= MulExpression
-		(WS (PLUS / MINUS) _ MulExpression)*
+		{@ WS @AddOp _ @MulExpression #BinaryOp }*
+
+AddOp
+	= {(PLUS / MINUS) #Operator }
 
 MulExpression
 	= UnaryExpression
-		(WS (MUL / DIV / MOD) _ UnaryExpression)*
+		{@ WS @MulOp _ @UnaryExpression #BinaryOp }*
+
+MulOp
+	= {(MUL / DIV / MOD) #Operator }
 
 UnaryExpression
-	= (PLUS / MINUS / NOT) _ UnaryExpression
+	= { @UnaryOp _ @UnaryExpression #UnaryOp }
 	/ SuffixExpression
 
+UnaryOp
+	= {(PLUS / MINUS / NOT) #Operator }
+
 SuffixExpression
-	= MemberExpression (INC / DEC)?
+	= MemberExpression {@ @SuffixOp #SuffixOp }?
+
+SuffixOp
+	= {(INC / DEC) #Operator }
 
 MemberExpression
 	= PrimaryExpression
-		( _ (ACCESSOR WS IDENTIFIER / LB _ Expression _ RB / Arguments))*
+		{@ _ (ACCESSOR WS @MemberName #Access / LB _ @Expression _ RB #Index / @Arguments #Call ) }*
+
+MemberName
+	= {IDENTIFIER #MemberName }
 
 PrimaryExpression
-	= NEW _ TypeName _ Arguments
-	/ INT_LITERAL
-	/ BYTE_LITERAL
-	/ INT16_LITERAL
-	/ UINT16_LITERAL
-	/ INT32_LITERAL
-	/ UINT32_LITERAL
-	/ INT64_LITERAL
-	/ UINT64_LITERAL
-	/ FLOAT_LITERAL
+	= NEW _ { @TypeName _ @Arguments #New }
+	/ { FLOAT_LITERAL #FloatValue }
+	/ { BYTE_LITERAL #IntValue }
+	/ { INT16_LITERAL #IntValue }
+	/ { UINT16_LITERAL #IntValue }
+	/ { INT32_LITERAL #IntValue }
+	/ { UINT32_LITERAL #IntValue }
+	/ { INT64_LITERAL #LongValue }
+	/ { UINT64_LITERAL #LongValue }
+	/ { INT_LITERAL #IntValue }
 	/ StringLiteral
-	/ PATH_LITERAL
+	/ { PATH_LITERAL #ObjectPath }
 	/ StringExpression
 	/ CommandSubstitution
 	/ AppliedName
 	/ SpecialName
-	/ LP _ Expression _ RP
-	/ LP _ Expression (_ COMMA _ Expression)+ _ RP
-	/ LB _ Expression (_ COMMA _ Expression)* _ RB
-	/ LBC _ MapEntry (_ COMMA _ MapEntry)* _ RBC
+	/ LP _ { @Expression #Group } _ RP
+	/ LP _ { @Expression (_ COMMA _ @Expression)+ #Tuple } _ RP
+	/ LB _ { @Expression (_ COMMA _ @Expression)* #Array } _ RB
+	/ LBC _ { @MapEntry (_ COMMA _ @MapEntry)* #Map } _ RBC
 
 MapEntry
-	= Expression WS COLON WS Expression
+	= { @Expression WS COLON WS @Expression #MapEntry }
 
 AppliedName
-	= APPLIED_NAME
+	= { APPLIED_NAME #Variable }
 
 SpecialName
-	= SPECIAL_NAME
+	= { SPECIAL_NAME #Variable }
 
 StringLiteral
-	= STRING_LITERAL
+	= { STRING_LITERAL #StringValue }
 
 Arguments
-	= LP (_ Expression ( _ COMMA _ Expression)*)? _ RP
+	= LP { (_ @Expression ( _ COMMA _ @Expression)*)?  #Arguments } _ RP
 
 StringExpression
 	= OPEN_DQUOTE
-		(STR_ELEMENT / Interpolation / CommandSubstitution)* CLOSE_DQUOTE
+		{ (@StrElement / @Interpolation / @CommandSubstitution)* #StringExpression } CLOSE_DQUOTE
+
+StrElement
+	= { STR_ELEMENT #StringElement }
 
 Interpolation
 	= AppliedName
 	/ SpecialName
-	/ START_INTERP Expression RBC
+	/ START_INTERP {Expression } RBC
 
 CommandSubstitution
-	= START_SUB_CMD CommandListExpression RP
+	= START_SUB_CMD { @CommandListExpression #CommandSubstitution } RP
