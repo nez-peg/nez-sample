@@ -1,0 +1,442 @@
+
+// ##############################
+// ##     lexer definition     ##
+// ##############################
+
+W = [0-9a-zA-Z_]+
+
+// lexical segment
+NUM = '0' / [1-9] [0-9]*
+INT = [+-]? NUM
+DIGITS = [0-9]+
+FLOAT_SUFFIX =  [eE] [+-]? NUM
+FLOAT = INT '.' DIGITS FLOAT_SUFFIX?
+
+SQUOTE_CHAR = ![\r\n'\\] . / '\\' [btnfr'\\]
+
+VAR_NAME = [_a-zA-Z] [_0-9a-zA-Z]*
+SPECIAL_NAMES = [@0?]
+PATH_CHARS = '/' / ('/' [_a-zA-Z0-9]+ )+
+CMD_START_CHAR = '\\' ![\r\n] . / ![ \t\r\n;'"`|&<>(){}$#![\]0-9] .
+CMD_CHAR       = '\\' . / '\\' [\r\n] / ![ \t\r\n;'"`|&<>(){}$#![\]] .
+
+
+
+// statement key word
+ASSERT      = 'assert'      !W
+BREAK       = 'break'       !W
+CATCH       = 'catch'       !W
+CLASS       = 'class'       !W
+CONTINUE    = 'continue'    !W
+DO          = 'do'          !W
+ELIF        = 'elif'        !W
+ELSE        = 'else'        !W
+EXTENDS     = 'extends'     !W
+EXPORT_ENV  = 'export-env'  !W
+FINALLY     = 'finally'     !W
+FOR         = 'for'         !W
+FUNCTION    = 'function'    !W
+IF          = 'if'          !W
+IMPORT_ENV  = 'import-env'  !W
+INTERFACE   = 'interface'   !W
+LET         = 'let'         !W
+NEW         = 'new'         !W
+NOT         = 'not'         !W
+RETURN      = 'return'      !W
+TRY         = 'try'         !W
+THROW       = 'throw'       !W
+TYPE_ALIAS  = 'type-alias'  !W
+VAR         = 'var'         !W
+WHILE       = 'while'       !W
+
+PLUS        = '+' ![+=]
+MINUS       = '-' ![-=]
+
+// literal
+INT_LITERAL    = INT
+BYTE_LITERAL   = INT 'b'
+INT16_LITERAL  = INT 'i16'
+INT32_LITERAL  = INT 'i32'
+INT64_LITERAL  = INT 'i64'
+UINT16_LITERAL = INT 'u16'
+UINT32_LITERAL = INT 'u32'
+UINT64_LITERAL = INT 'u64'
+
+FLOAT_LITERAL = FLOAT
+
+STRING_LITERAL = ['] SQUOTE_CHAR* [']
+
+PATH_LITERAL = 'p' ['] PATH_CHARS [']
+
+OPEN_DQUOTE = ["]
+CLOSE_DQUOTE = ["]
+
+BQUOTE_LITERAL = [`] ('\\' '`' / ![\n\r] . )+ [`]
+
+START_SUB_CMD = '$('
+
+APPLIED_NAME = '$' VAR_NAME
+SPECIAL_NAME = '$' SPECIAL_NAMES
+
+LP = '('
+RP = ')'
+LB = '['
+RB = ']'
+LBC = '{'
+RBC = '}'
+
+COMMAND = CMD_START_CHAR CMD_CHAR*
+
+COLON = ':'
+COMMA = ','
+
+MUL = '*' !'='
+DIV = '/' !'='
+MOD = '%' !'='
+LA = '<' !'='
+RA = '>' !'='
+LE = '<='
+GE = '>='
+EQ = '=='
+NE = '!='
+AND = '&' !'&'
+OR = '|' !'|'
+XOR = '^'
+COND_AND = '&&'
+COND_OR = '||'
+RE_MATCH = '=~'
+RE_UNMATCH = '!~'
+
+INC = '++'
+DEC = '--'
+
+ASSIGN = '=' ![~=]
+ADD_ASSIGN = '+='
+SUB_ASSIGN = '-='
+MUL_ASSIGN = '*='
+DIV_ASSIGN = '/='
+MOD_ASSIGN = '%='
+
+AS = 'as' !W
+FUNC = 'Func' !W
+IN = 'in' !W
+IS = 'is' !W
+
+IDENTIFIER = VAR_NAME
+
+ACCESSOR = '.'
+
+LINE_END = ';'
+NEW_LINE = [\r\n][ \t\r\n]*
+COMMENT = '#' (![\r\n] .)*
+WHITE_SPACE = [ \t]+
+ESCAPE_NEW_LINE = '\\' [\r\n]
+
+OTHER = . / [\r\n]
+
+STR_ELEMENT = (![\r\n`$"\\] . / '\\' [$btnfr"`\\])+
+
+INNER_NAME = APPLIED_NAME / '${' VAR_NAME '}'
+INNER_SPECIAL_NAME = SPECIAL_NAME / '${' SPECIAL_NAMES '}'
+
+START_INTERP = '${'
+
+CMD_ARG_PART = CMD_CHAR+
+
+REDIR_IN_2_FILE = '<'
+REDIR_OUT_2_FILE = '>' ![>&] / '1>' ![>&]
+REDIR_OUT_2_FILE_APPEND = '>>' / '1>>'
+REDIR_ERR_2_FILE = '2>' ![>&]
+REDIR_ERR_2_FILE_APPEND = '2>>'
+REDIR_MERGE_ERR_2_OUT_2_FILE = '&>' / '>&'
+REDIR_MERGE_ERR_2_OUT_2_FILE_APPEND = '&>>'
+REDIR_MERGE_ERR_2_OUT = '2>&1'
+
+CMD_SEP = [ \t]+
+PIPE = '|' !'|'
+BACKGROUND = '&' !'&'
+OR_LIST = '||'
+AND_LIST = '&&'
+
+TYPE_PATH = VAR_NAME ('.' VAR_NAME)+
+
+// ###############################
+// ##     parser definition     ##
+// ###############################
+
+EOF
+	= !.
+
+__WS
+	= WHITE_SPACE / ESCAPE_NEW_LINE / COMMENT
+
+WS
+	= __WS*
+_
+	= (__WS / NEW_LINE)*
+
+
+// entry point
+File
+	= TopLevel
+
+TopLevel
+	= { (_ @TopLevelStatement)* _ #Root }
+
+TopLevelStatement
+	= Function
+	/ Interface
+	/ TypeAlias
+	/ Statement
+
+Function
+	= { @FuncDecl @Block #Function }
+
+FuncDecl
+	= { FUNCTION _ @{IDENTIFIER #Name }  _ LP _
+		(@FuncParam (WS COMMA _ @FuncParam)* )?
+		_ RP
+		(WS COLON @ReturnType)? #FuncDecl }
+
+FuncParam
+	= { @{APPLIED_NAME #ParamName } WS COLON @TypeName #Param }
+
+ReturnType
+	= { @TypeName (_ @TypeName)* #ReturnType }
+
+Interface
+	= { INTERFACE _ @{TYPE_PATH #Name } _ LBC _
+		( @PropertyDecl _ STATEMENT_END
+		/ @FuncDecl _ STATEMENT_END)+
+		#Interface }
+
+PropertyDecl
+	= { @{(VAR / LET) #AccessLevel} _ @{IDENTIFIER #VarName } _ COLON _ @TypeName #VarDecl }
+
+TypeAlias
+	= { TYPE_ALIAS _ @{IDENTIFIER #Name } _ @TypeName #TypeAlias }
+
+TypeName
+	= { @{IDENTIFIER #TemplateName } WS '<' _ @TypeName ( _ ',' _ @TypeName )* _ '>' #ReifiedType }
+	/ { IDENTIFIER #ClassType }
+	/ { FUNC WS '<' _ @TypeName _ ( @{'[' _ @TypeName (_ ',' _ @TypeName)* _ ']' #ParamTypes })? '>' #FuncType }
+	/ { TYPE_PATH #IfaceType }
+
+Statement
+	= { #Empty LINE_END }
+	/ { ASSERT _ LP _ @CommandOrExpression _ RP _ STATEMENT_END #Assert }
+	/ { BREAK STATEMENT_END #Break }
+	/ { CONTINUE STATEMENT_END #Continue }
+	/ { EXPORT_ENV _ @{IDENTIFIER #EnvName } WS ASSIGN @Expression STATEMENT_END #ExportEnv}
+	/ ForStatement
+	/ { IF _ LP _ @CommandOrExpression _ RP @Block
+		( @{ ELIF _ LP _ @CommandOrExpression _ RP @Block #Elif })*
+		(  @{ ELSE @Block #Else })? #If }
+	/ { IMPORT_ENV _ @{IDENTIFIER #EnvName } _ STATEMENT_END #ImportEnv }
+	/ { RETURN (WS @Expression)? STATEMENT_END #Return }
+	/ { THROW _ @Expression STATEMENT_END #Throw }
+	/ { WHILE _ LP _ @CommandOrExpression _ RP @Block #While }
+	/ { DO @Block WHILE _ LP _ @CommandOrExpression _ RP STATEMENT_END #DoWhile }
+	/ { TRY @Block (_ @CatchStatement)* (FINALLY @Block)? }
+	/ VariableDeclaration STATEMENT_END
+	/ CommandListExpression STATEMENT_END
+	/ Expression STATEMENT_END
+
+STATEMENT_END
+	= WS (EOF / LINE_END / NEW_LINE)
+
+Block
+	= _ LBC { (_ @Statement)+ #Block } _ RBC _
+
+VariableDeclaration
+	= { @{ (VAR / LET) #AccessLevel} _ @{ IDENTIFIER #VarName } WS ASSIGN _ @CommandOrExpression #VarDecl }
+
+ForStatement
+	= { FOR _ LP _ @ForInit _ LINE_END _ @ForCond _ LINE_END _ @ForIter _ RP @Block #For }
+	/ { FOR _ LP _ @{ APPLIED_NAME #VarName } WS IN _ @Expression _ RP @Block #ForIn }
+
+ForInit
+	= (VariableDeclaration / Expression)?
+
+ForCond
+	= CommandOrExpression?
+
+ForIter
+	= Expression?
+
+CatchStatement
+	= { CATCH _ LP _ @{ APPLIED_NAME #ExceptionName } (WS COLON _ @TypeName) _ RP @Block #Catch }
+
+CommandListExpression
+	= OrListCommand
+
+OrListCommand
+	= AndListCommand {@ CMD_SEP? OR_LIST _ @AndListCommand #ConsOr }*
+
+AndListCommand
+	= PipedCommand {@ CMD_SEP? AND_LIST _ @PipedCommand #CondAnd }*
+
+PipedCommand
+	= { @Command (CMD_SEP? PIPE _ @Command)* #PipedCommand }
+
+Command
+	= { @{ COMMAND #CommandName } (CMD_SEP (@CmdArg / @RedirOption))* #Command }
+
+RedirOption
+	= { @{(REDIR_IN_2_FILE
+		/ REDIR_OUT_2_FILE
+		/ REDIR_OUT_2_FILE_APPEND
+		/ REDIR_ERR_2_FILE
+		/ REDIR_ERR_2_FILE_APPEND
+		/ REDIR_MERGE_ERR_2_OUT_2_FILE
+		/ REDIR_MERGE_ERR_2_OUT_2_FILE_APPEND) #RedirOp } CMD_SEP?
+		@CmdArg
+	/ @{ REDIR_MERGE_ERR_2_OUT #RedirOp } #RedirOption }
+
+CmdArg
+	= { (@CmdArgSeg)+ #CmdArg }
+
+CmdArgSeg
+	= { CMD_ARG_PART #CmdArgPart }
+	/ StringLiteral
+	/ StringExpression
+	/ CommandSubstitution
+	/ Interpolation
+
+// expression
+CommandOrExpression
+	= CommandListExpression / Expression
+
+Expression
+	= AssignExpression
+
+AssignExpression
+	= CondOrExpression
+		{@ WS @AssignOp _ @CondOrExpression #Assign }*
+
+AssignOp
+	= {(ASSIGN / ADD_ASSIGN / SUB_ASSIGN / MUL_ASSIGN / DIV_ASSIGN / MOD_ASSIGN) #Operator }
+
+CondOrExpression
+	= CondAndExpression
+		{@ WS COND_OR _ @CondAndExpression #CondOr }*
+
+CondAndExpression
+	= OrExpression
+		{@ WS COND_AND _ @OrExpression #CondAnd }*
+
+OrExpression
+	= XorExpression
+		{@ WS @{ OR #Operator } _ @XorExpression #BinaryOp }*
+
+XorExpression
+	= AndExpression
+		{@ WS @{ XOR #Operator } _ @AndExpression #BinaryOp }*
+
+AndExpression
+	= EqualityExpression
+		{@ WS @{ AND #Operator } _ @EqualityExpression #BinaryOp }*
+
+EqualityExpression
+	= TypeExpression
+		{@ WS @EqualityOp _ @TypeExpression #BinaryOp }*
+
+EqualityOp
+	= {(EQ / NE / RE_MATCH / RE_UNMATCH) #Operator }
+
+TypeExpression
+	= RelationalExpression
+		{@ WS (AS #Cast / IS #InstanceOf) _ @TypeName }*
+
+RelationalExpression
+	= AddExpression
+		{@ WS @RelationalOp _ @AddExpression #BinaryOp }*
+
+RelationalOp
+	= {(LA / RA / LE / GE) #Operator }
+
+AddExpression
+	= MulExpression
+		{@ WS @AddOp _ @MulExpression #BinaryOp }*
+
+AddOp
+	= {(PLUS / MINUS) #Operator }
+
+MulExpression
+	= UnaryExpression
+		{@ WS @MulOp _ @UnaryExpression #BinaryOp }*
+
+MulOp
+	= {(MUL / DIV / MOD) #Operator }
+
+UnaryExpression
+	= { @UnaryOp _ @UnaryExpression #UnaryOp }
+	/ SuffixExpression
+
+UnaryOp
+	= {(PLUS / MINUS / NOT) #Operator }
+
+SuffixExpression
+	= MemberExpression {@ @SuffixOp #SuffixOp }?
+
+SuffixOp
+	= {(INC / DEC) #Operator }
+
+MemberExpression
+	= PrimaryExpression
+		{@ _ (ACCESSOR WS @MemberName #Access / LB _ @Expression _ RB #Index / @Arguments #Call ) }*
+
+MemberName
+	= {IDENTIFIER #MemberName }
+
+PrimaryExpression
+	= NEW _ { @TypeName _ @Arguments #New }
+	/ { FLOAT_LITERAL #FloatValue }
+	/ { BYTE_LITERAL #IntValue }
+	/ { INT16_LITERAL #IntValue }
+	/ { UINT16_LITERAL #IntValue }
+	/ { INT32_LITERAL #IntValue }
+	/ { UINT32_LITERAL #IntValue }
+	/ { INT64_LITERAL #LongValue }
+	/ { UINT64_LITERAL #LongValue }
+	/ { INT_LITERAL #IntValue }
+	/ StringLiteral
+	/ { PATH_LITERAL #ObjectPath }
+	/ StringExpression
+	/ CommandSubstitution
+	/ AppliedName
+	/ SpecialName
+	/ LP _ { @Expression #Group } _ RP
+	/ LP _ { @Expression (_ COMMA _ @Expression)+ #Tuple } _ RP
+	/ LB _ { @Expression (_ COMMA _ @Expression)* #Array } _ RB
+	/ LBC _ { @MapEntry (_ COMMA _ @MapEntry)* #Map } _ RBC
+
+MapEntry
+	= { @Expression WS COLON WS @Expression #MapEntry }
+
+AppliedName
+	= { APPLIED_NAME #Variable }
+
+SpecialName
+	= { SPECIAL_NAME #Variable }
+
+StringLiteral
+	= { STRING_LITERAL #StringValue }
+
+Arguments
+	= LP { (_ @Expression ( _ COMMA _ @Expression)*)?  #Arguments } _ RP
+
+StringExpression
+	= OPEN_DQUOTE
+		{ (@StrElement / @Interpolation / @CommandSubstitution)* #StringExpression } CLOSE_DQUOTE
+
+StrElement
+	= { STR_ELEMENT #StringElement }
+
+Interpolation
+	= AppliedName
+	/ SpecialName
+	/ START_INTERP {Expression } RBC
+
+CommandSubstitution
+	= START_SUB_CMD { @CommandListExpression #CommandSubstitution } RP
