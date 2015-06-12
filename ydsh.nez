@@ -16,9 +16,9 @@ SQUOTE_CHAR = ![\r\n'\\] . / '\\' [btnfr'\\]
 
 VAR_NAME = [_a-zA-Z] [_0-9a-zA-Z]*
 SPECIAL_NAMES = [@0?]
-PATH_CHARS = '/' / ('/' [_a-zA-Z0-9]+ )+
+PATH_CHARS = ('/' [_a-zA-Z0-9]+ )+ / '/'
 CMD_START_CHAR = '\\' ![\r\n] . / ![ \t\r\n;'"`|&<>(){}$#![\]0-9] .
-CMD_CHAR       = '\\' . / '\\' [\r\n] / ![ \t\r\n;'"`|&<>(){}$#![\]] .
+CMD_CHAR       = '\\' . / ![ \t\r\n;'"`|&<>(){}$#![\]] .
 
 
 
@@ -85,7 +85,15 @@ RB = ']'
 LBC = '{'
 RBC = '}'
 
-COMMAND = CMD_START_CHAR CMD_CHAR*
+COMMAND
+	= !(ASSERT / BREAK / CATCH / CLASS
+	/ CONTINUE / DO / ELIF / ELSE
+	/ EXTENDS / EXPORT_ENV / FINALLY
+	/ FOR / FUNCTION / IF / IMPORT_ENV
+	/ INTERFACE / LET / NEW / NOT
+	/ RETURN / TRY / THROW / TYPE_ALIAS
+	/ VAR / WHILE)
+	CMD_START_CHAR CMD_CHAR*
 
 COLON = ':'
 COMMA = ','
@@ -154,7 +162,7 @@ REDIR_MERGE_ERR_2_OUT = '2>&1'
 
 CMD_SEP = [ \t]+
 PIPE = '|' !'|'
-BACKGROUND = '&' !'&'
+BACKGROUND = '&' ![>&]
 OR_LIST = '||'
 AND_LIST = '&&'
 
@@ -196,18 +204,18 @@ FuncDecl
 	= { FUNCTION _ @{IDENTIFIER #Name }  _ LP _
 		(@FuncParam (WS COMMA _ @FuncParam)* )?
 		_ RP
-		(WS COLON @ReturnType)? #FuncDecl }
+		(WS COLON _ @ReturnType)? #FuncDecl }
 
 FuncParam
-	= { @{APPLIED_NAME #ParamName } WS COLON @TypeName #Param }
+	= { @{APPLIED_NAME #ParamName } WS COLON _ @TypeName #Param }
 
 ReturnType
-	= { @TypeName (_ @TypeName)* #ReturnType }
+	= { @TypeName (_ ',' _ @TypeName)* #ReturnType }
 
 Interface
 	= { INTERFACE _ @{TYPE_PATH #Name } _ LBC _
-		( @PropertyDecl _ STATEMENT_END
-		/ @FuncDecl _ STATEMENT_END)+
+		( _ @PropertyDecl STATEMENT_END
+		/ _ @FuncDecl STATEMENT_END)+ _ RBC
 		#Interface }
 
 PropertyDecl
@@ -217,27 +225,27 @@ TypeAlias
 	= { TYPE_ALIAS _ @{IDENTIFIER #Name } _ @TypeName #TypeAlias }
 
 TypeName
-	= { @{IDENTIFIER #TemplateName } WS '<' _ @TypeName ( _ ',' _ @TypeName )* _ '>' #ReifiedType }
-	/ { IDENTIFIER #ClassType }
-	/ { FUNC WS '<' _ @TypeName _ ( @{'[' _ @TypeName (_ ',' _ @TypeName)* _ ']' #ParamTypes })? '>' #FuncType }
-	/ { TYPE_PATH #IfaceType }
+	= { TYPE_PATH #IfaceType }
+	/ { FUNC WS '<' _ @TypeName _ ( @{',' _ '[' _ @TypeName (_ ',' _ @TypeName)* _ ']' #ParamTypes })?  _ '>' #FuncType }
+	/ { @{!FUNC IDENTIFIER #TemplateName } WS '<' _ @TypeName ( _ ',' _ @TypeName )* _ '>' #ReifiedType }
+	/ { !FUNC IDENTIFIER #ClassType }
 
 Statement
 	= { #Empty LINE_END }
-	/ { ASSERT _ LP _ @CommandOrExpression _ RP _ STATEMENT_END #Assert }
+	/ { ASSERT _ LP _ @CommandOrExpression _ RP STATEMENT_END #Assert }
 	/ { BREAK STATEMENT_END #Break }
 	/ { CONTINUE STATEMENT_END #Continue }
-	/ { EXPORT_ENV _ @{IDENTIFIER #EnvName } WS ASSIGN @Expression STATEMENT_END #ExportEnv}
+	/ { EXPORT_ENV _ @{IDENTIFIER #EnvName } WS ASSIGN _ @Expression STATEMENT_END #ExportEnv}
 	/ ForStatement
 	/ { IF _ LP _ @CommandOrExpression _ RP @Block
 		( @{ ELIF _ LP _ @CommandOrExpression _ RP @Block #Elif })*
 		(  @{ ELSE @Block #Else })? #If }
-	/ { IMPORT_ENV _ @{IDENTIFIER #EnvName } _ STATEMENT_END #ImportEnv }
+	/ { IMPORT_ENV _ @{IDENTIFIER #EnvName } STATEMENT_END #ImportEnv }
 	/ { RETURN (WS @Expression)? STATEMENT_END #Return }
 	/ { THROW _ @Expression STATEMENT_END #Throw }
 	/ { WHILE _ LP _ @CommandOrExpression _ RP @Block #While }
 	/ { DO @Block WHILE _ LP _ @CommandOrExpression _ RP STATEMENT_END #DoWhile }
-	/ { TRY @Block (_ @CatchStatement)* (FINALLY @Block)? }
+	/ { TRY @Block (_ @CatchStatement)* (FINALLY @Block)? #Try}
 	/ VariableDeclaration STATEMENT_END
 	/ CommandListExpression STATEMENT_END
 	/ Expression STATEMENT_END
@@ -265,7 +273,7 @@ ForIter
 	= Expression?
 
 CatchStatement
-	= { CATCH _ LP _ @{ APPLIED_NAME #ExceptionName } (WS COLON _ @TypeName) _ RP @Block #Catch }
+	= { CATCH _ LP _ @{ APPLIED_NAME #ExceptionName } (WS COLON _ @TypeName)? _ RP @Block #Catch }
 
 CommandListExpression
 	= OrListCommand
@@ -312,7 +320,7 @@ Expression
 
 AssignExpression
 	= CondOrExpression
-		{@ WS @AssignOp _ @CondOrExpression #Assign }*
+		{@ WS @AssignOp _ @CommandOrExpression #Assign }?
 
 AssignOp
 	= {(ASSIGN / ADD_ASSIGN / SUB_ASSIGN / MUL_ASSIGN / DIV_ASSIGN / MOD_ASSIGN) #Operator }
@@ -434,9 +442,9 @@ StrElement
 	= { STR_ELEMENT #StringElement }
 
 Interpolation
-	= AppliedName
-	/ SpecialName
-	/ START_INTERP {Expression } RBC
+	= { INNER_NAME #InnerName }
+	/ { INNER_SPECIAL_NAME #InnerName }
+	/ { START_INTERP @Expression RBC #InnerExpression }
 
 CommandSubstitution
-	= START_SUB_CMD { @CommandListExpression #CommandSubstitution } RP
+	= START_SUB_CMD CMD_SEP? { @CommandListExpression #CommandSubstitution } CMD_SEP? RP
