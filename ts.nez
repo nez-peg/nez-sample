@@ -2,8 +2,8 @@
 //==========
 
 File
-  = { __ (@DeclarationElement (__ @DeclarationElement)* #DTSFile
-  / @ImplementationElement (__ @ImplementationElement)* #TsFile)? __ }
+  = { __ (@DeclarationElement (__ @DeclarationElement)* __ EOF #DTSFile
+  / @ImplementationElement (__ @ImplementationElement)* __ EOF #TsFile)? }
 
   W
     = [a-zA-Z0-9_]
