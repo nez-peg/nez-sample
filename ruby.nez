@@ -6,12 +6,11 @@
 File
     = (EOS? _)* CompleteStatement
 
-
 //-----------------------------------------
 EOS
     = _ ';'
     / _ LINE_TERMINATOR
-    / _ SINGLE_LINE_COMMENT LINE_TERMINATOR_SEQUENCE
+    / _ SINGLE_LINE_COMMENT LINE_TERMINATOR
     / __ EOF
 
 LINE_TERMINATOR
@@ -20,31 +19,20 @@ LINE_TERMINATOR
 SINGLE_LINE_COMMENT
     = '#' (!LINE_TERMINATOR .)*
 
-LINE_TERMINATOR_SEQUENCE
-    = '\n' / '\r\n' / '\r'
-
 __
     = SPACE_OR_NEWLINE*
 
 SPACE_OR_NEWLINE
-    = SPACE / LINE_TERMINATOR_SEQUENCE / COMMENT
+    = SPACE / LINE_TERMINATOR / SINGLE_LINE_COMMENT
 
 SPACE
     = [\t\v\f \u00A0\uFEFF]
-
-COMMENT
-    = SINGLE_LINE_COMMENT
-    / '__END__' .*
-/////////////////////////
-
 
 EOF
     = !.
 
 _
     = (SPACE)*
-
-
 
 //-------------------------------------------------------
 
@@ -201,7 +189,7 @@ SOURCE
     = .
 
 ESCAPE_SEQUENCE
-    = '\\' / ["'bfnrtv] / OCTA_ESCAPE_SEQUENCE / HEX_ESCAPE_SEQUENCE / UNICODE_ESCAPE_SEQUUENCE / LINE_TERMINATOR_SEQUENCE / .
+    = '\\' / ["'bfnrtv] / OCTA_ESCAPE_SEQUENCE / HEX_ESCAPE_SEQUENCE / UNICODE_ESCAPE_SEQUUENCE / LINE_TERMINATOR / .
 
 OCTA_ESCAPE_SEQUENCE
     = OCT OCT OCT
@@ -255,7 +243,7 @@ PN_BODY
     / PN_BRAKET
     / PN_ANGLE
     / <if PNSpace> ' ' (!' ' .)* ' '
-    / <if PNSpace> <def EON LINE_TERMINATOR_SEQUENCE> (!<isa EON> .)* <isa EON>
+    / <if PNSpace> <def EON LINE_TERMINATOR> (!<isa EON> .)* <isa EON>
 
 PN_PAREN
     = '(' (PN_PAREN / ![()] .)* ')'
@@ -279,18 +267,10 @@ HereDocument
       (!(_ <isa HereDocID>) (!HD_NEWLINE .)* HD_NEWLINE)*
       _ <isa HereDocID> HD_NEWLINE
       #HereDocument
-    }/* / { "<<" (
-          ["] <def HereDocID IDENTIFIER> ["]
-        / ['] <def HereDocID IDENTIFIER> [']
-        / [`] <def HereDocID IDENTIFIER> [`]
-        / <def HereDocID IDENTIFIER>) HD_NEWLINE
-      (!<isa HereDocID> (!HD_NEWLINE .)* HD_NEWLINE)*
-      <isa HereDocID> HD_NEWLINE
-      #HereDocument
-    }*/
+    }
 
 HD_NEWLINE
-    = LINE_TERMINATOR_SEQUENCE
+    = LINE_TERMINATOR
 
 
 ArrayLiteral
@@ -491,6 +471,8 @@ Singleton
     / TrueExpression
     / FalseExpression
     / '(' __ Expression __ ')'
+
+
 
 addLHSCall
     = '[' __ (@[1]Args)? __ ']' #Indexer
