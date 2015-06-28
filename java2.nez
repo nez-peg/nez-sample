@@ -161,11 +161,10 @@ KEYWORD
 	/ "synchronized" / "this" / "throws" / "throw" / "transient"
 	/ "true" / "try" / "void" / "volatile" / "while"
 
-
 /* TopLevel */
 
-format #PackageDeclaration[1]      `package $[0];`
-format #ImportDeclaration[1]       `import $[0];`
+format #PackageDeclaration[1]      `${NL}}package $[0];`
+format #ImportDeclaration[1]       `${NL}import $[0];`
 format #WildCardName[1]            `$[0].*`
 
 example PackageDeclaration '''
@@ -181,7 +180,6 @@ public TopLevel
 	/ ImportDeclaration
 	/ TypeDeclaration
 
-
 public PackageDeclaration
 	= { "package" @QualifiedName #PackageDeclaration } ";" 
 
@@ -191,57 +189,91 @@ public ImportDeclaration
 public PackageName
 	= QualifiedName {@ "." "*" #WildCardName}?
 
-TypeDeclaration
-	= ClassDeclaration
-	/ InterfaceDeclaration
-	/ { ";" #Empty }
-
 /* Modifiers */
 
-format #Final[0] `final`
+format #Modifiers[*]    `$[0 ` ` -1] `
+format #Modifiers[0]    ``
+format #Final[0]        `final`
+format #Public[0]       `public`
+format #Protected[0]    `protected`
+format #Private[0]      `private`
+format #Abstract[0]     `abstract`
+format #Static[0]       `static`
+format #Strictfp[0]     `strictfp`
+format #Transient[0]    `transient`
+format #Volatile[0]     `volatile`
+format #Synchronized[0] `synchronized`
 
 Modifiers
 	= { (@Modifier)* #Modifiers }
 
 Modifier
-	= { "final" #Final }
+	= { "final"      #Final }
 	/ { "public"     #Public }
 	/ { "protected"  #Protected }
 	/ { "private"    #Private }
 	/ { "abstract"   #Abstract }
-	/ { "final"      #Final }
 	/ { "static"     #Static }
 	/ { "strictfp"   #Strictfp }	
 	/ { "transient"  #Transient }
 	/ { "volatile"   #Volatile }
 	/ { "synchronized"  #Synchronized }
 
-/* Declaration */
+/* Type Declaration */
 
-format #VarDecl[1] `$[0]`
-format #VarDecl[2] `$[0] = $[1]`
-format #VarName[1] `$[0][]`
-format #VarName[1] `$[0][$[1]]`
-format #Array[*] `{$[0 `, ` -1]}`
+format #Class[5]     `$[0]class $[1] extends $[2] implements $[3] $[4]`
+format #Class[4]     `$[0]class $[1] extends $[2] $[3]`
+format #Interface[4] `$[0]interface $[1] extends $[2] $[3]`
+format #Interface[3] `$[0]interface $[1] $[2]`
+format #Block[*]     `{${inc}${NL}$[0 `${NL}` -1]${dec}${NL}}`
+format #Block[0]     `{${NL}}`
+format #Empty[0]     `;`
 
-/* class type, enum type */
+TypeDeclaration
+	= ClassDeclaration
+	/ InterfaceDeclaration
+	/ { ";" #Empty }
+
+/* Class and interface */
+
+example ClassDeclaration '''
+class C {
+}
+'''
+
+example ClassDeclaration '''
+public class C extends D implements E, F {
+	static int f = 1;
+}
+'''
+
+example InterfaceDeclaration '''
+interface C {
+}
+'''
+
+example InterfaceDeclaration '''
+public interface C extends D, E {
+	public static int f = 1;
+}
+'''
 
 ClassDeclaration
-	= { @Modifiers "class" @Identifier (@SuperClass)? (@SuperInterfaces)* @ClassBody #ClassDeclaration }
+	= { @Modifiers "class" @Identifier @SuperClass (@SuperInterfaces)? @ClassBody #Class }
 
 SuperClass
-	= "extends" { @ClassOrInterfaceType #SuperClass }
+	= "extends" ClassOrInterfaceType / { `Object` #Name }
 
 SuperInterfaces
-	= "implements" { @ClassOrInterfaceTypes #SuperInterfaces }
+	= "implements" ClassOrInterfaceTypes
 
 ClassBody
-	= "{" { (@ClassBodyDeclaration)* #ClassBody } "}"
+	= "{" { (@ClassBodyDeclaration)* #Block } "}"
 
 ClassBodyDeclaration
 	= ClassMemberDeclaration
 	/ { @Block #InstanceInisializer }
-	/ "static" { @Block #StaticInitializer }
+	/ { "static" @Block #StaticInitializer }
 	/ ConstructorDeclaration
 
 ClassMemberDeclaration
@@ -251,58 +283,44 @@ ClassMemberDeclaration
 	/ InterfaceDeclaration
 	/ { ";" #Empty }
 
-//interface, annotation type
-
 InterfaceDeclaration
-	= { @Modifiers "interface" @Identifier (@ExtendsInterfaces )* @InterfaceBody #InterfaceDeclaration }
+	= { @Modifiers "interface" @Identifier (@ExtendsInterfaces)? @InterfaceBody #Interface }
 	
 ExtendsInterfaces
-	= { "extends" @ClassOrInterfaceTypes #ExtendsInterfaces }
+	= "extends" ClassOrInterfaceTypes
 
 InterfaceBody
-	= "{" { (@InterfaceMemberDeclaration )* #InterfaceBody } "}"
+	= "{" { (@InterfaceMemberDeclaration )* #Block } "}"
 
 InterfaceMemberDeclaration
-	= ConstantDeclaration
-	/ InterfaceMethodDeclaration
+	= FieldDeclaration
 	/ ClassDeclaration
 	/ InterfaceDeclaration
 	/ { ";" #Empty }
 
-//field, constant
+/* Field, Constant */
+
 FieldDeclaration
 	= { @Modifiers @Type @InitDeclList #Field } ";"
-
-ConstantDeclaration  /* used in interface */
-	= { @Modifiers @Type @InitDeclList #Constant } ";"
-
 
 /* Method */
 
 MethodDeclaration
-	= { @Modifiers @TypeOrVoid @Identifier "(" @MethodParamList ")" (@Throws)? (@Block / ";" ) #Method }
-
-InterfaceMethodDeclaration
-	= { @Modifiers @TypeOrVoid @Identifier "(" @MethodParamList ")" (@Throws)? #Method } ";"
+	= { @Modifiers @TypeOrVoid @Identifier "(" @MethodParamList ")" @Throws (@Block / ";" ) #Method }
 
 MethodParamList
-	= { (@MethodParam "," )* @VarParam #List }
-	/ { ( @MethodParam ("," @MethodParam)* )? #List }
+	= { ( @MethodParam ("," @MethodParam)* )? #CommaList }
 
 MethodParam
 	= { @Type @VarName #Param }
 
-VarParam
-	= { @Type "..." @VarName #VarParam }
-
 Throws
-	= "throws" { @ClassOrInterfaceTypes #Throws }
+	= "throws"? ClassOrInterfaceTypes
 
-
-//constructor
+// Constructor
 
 ConstructorDeclaration
-	= { @Modifiers @ReferenceType "(" @MethodParamList ")" (@Throws)? @ConstructorBody #Constructor }
+	= { @Modifiers @ReferenceType "(" @MethodParamList ")" @Throws @ConstructorBody #Constructor }
 
 ConstructorBody
 	= { "{" (@ExplicitConstructorInvocation )? ((@Statement / @LocalDeclaration) )* "}" #Block }
@@ -312,82 +330,6 @@ ExplicitConstructorInvocation
 	/ { @{ @Super "(" addArgumentExpressionList? ")" #List } #ExplicitConstructorInvocation } ";"
 	/ { @PostfixExpression "." @Super @{ "(" addArgumentExpressionList? ")" #List } #ExplicitConstructorInvocation  } ";"
 
-/* Types, Values, Variables */
-
-format #Annotated[2]  `$[0] $[1]`
-format #Tvoid[0]      `void`
-format #Tbyte[0]      `byte`
-format #Tshort[0]     `short`
-format #Tint[0]       `int`
-format #Tlong[0]      `long`
-format #Tfloat[0]     `float`
-format #Tdouble[0]    `double`
-
-format #Tarray[1]     `$[0][]`
-format #Tarray[2]     `$[0] $[1] []`
-
-public Type
-	= ReferenceType    /* to accept int[] */
-	/ PrimitiveType
-
-public PrimitiveType
-	= NumericType
-	/ BooleanType
-
-NumericType
-	= IntegralType 
-	/ FloatingPointType
-
-IntegralType
-	= { "byte"    #Tbyte }
-	/ { "char"    #Tchar }
-	/ { "short"   #Tshort }
-	/ { "int"     #Tint }
-	/ { "long"    #Tlong }
-
-FloatingPointType
-	= { "float"   #Tfloat }
-	/ { "double"  #Tdouble }
-
-BooleanType
-	= { "boolean" #Tboolean }
-
-ReferenceType
-	= ArrayType
-	/ ClassOrInterfaceType
-
-ArrayType
-	= (PrimitiveType / ClassOrInterfaceType ) {@ "[" "]" #Tarray }+
-
-ClassOrInterfaceType
-	= ClassType 
-	/ InterfaceType
-
-
-/* FIXME
- * ClassType
- *  {Annotation} Identifier [TypeArguments]
- *  ClassOrInterfaceType . {Annotation} Identifier [TypeArguments] */
-	
-ClassType
-	= QualifiedName
-
-InterfaceType
-	= ClassType
-
-Void
-	= { "void" #Tvoid }
-
-TypeOrVoid
-	= Type 
-	/ Void
-
-NonArrayType
-	= ClassOrInterfaceType 
-	/ PrimitiveType
-
-ClassOrInterfaceTypes
-	= { @ClassOrInterfaceType ("," @ClassOrInterfaceType)* #TypeList }
 
 // Block, Statement
 //===================
@@ -399,7 +341,13 @@ LocalDeclaration
 	= VariableDeclaration ";"
 	/ ClassDeclaration
 
-/* local variable */
+/* Declaration */
+
+format #VarDecl[1] `$[0]`
+format #VarDecl[2] `$[0] = $[1]`
+format #VarName[1] `$[0][]`
+format #VarName[1] `$[0][$[1]]`
+format #Array[*] `{$[0 `, ` -1]}`
 
 VariableDeclaration
 	= { @Modifiers @Type @InitDeclList #Declaration }
@@ -420,7 +368,8 @@ Initializer
 ArrayInitializer
 	= { "{" (@Initializer ("," @Initializer)*)? ","? "}" #Array }
 
-/* statements */
+
+/* Statements */
 
 Statement
 	= Block
@@ -429,13 +378,12 @@ Statement
 	/ { "switch" "(" @Expression ")" @Statement #Switch }
 	/ { "while"  "(" @Expression ")" @Statement #While }
 	/ { "do" @Statement "while" "(" @Expression ")" ";" #DoWhile }
-	/ { "for" "(" (@Expressions)?  ";" (@Expression)? ";" (@Expressions)? ")" @Statement #For }
 	/ { "for" "(" @VariableDeclaration ";" (@Expression)? ";" (@Expressions)? ")" @Statement #For }
+	/ { "for" "(" (@Expressions)?  ";" (@Expression)? ";" (@Expressions)? ")" @Statement #For }
 	/ { "goto" @Identifier ";" #Goto }
 	/ { "continue" (@Identifier)? ";" #Continue }
 	/ { "break" (@Identifier)? ";" #Break }
 	/ { "return" (@Expression)? ";" #Return }
-	/ { "try" @ResourceStatement @Block ( @CatchBlock)* ( @{ "finally" @Block #Finally })? #Try }
 	/ { "try" @Block (@CatchBlock )* @{ "finally" @Block #Finally } #Try }
 	/ { "try" @Block ( @CatchBlock)+ #Try }
 	/ { "throw" @Expression ";" #Throw }
@@ -447,11 +395,6 @@ Statement
 	/ { ";" #Empty }
 
 //trycatch
-ResourceStatement
-	= "(" { @Resource ( ";" @Resource)* #ResourceList } ";"? ")"
-
-Resource
-	= { @Type @Identifier "=" @Expression #Declaration }
 
 CatchBlock
 	= { "catch" "(" @CatchParameter ")" @Block #Catch }
@@ -667,37 +610,109 @@ MethodReference
 format #Name[0] `${text}`
 format #QualifiedName[2] `$[0].$[1]`
 
-//Name
-//	= { NAME #Name } _
+example Identifier name$java
+example QualifiedName java.io.Lang
 
-Identifier
+public Identifier
 	= { NAME #Name } _
 
-QualifiedName
+public QualifiedName
 	= Identifier {@ "." @Identifier #QualifiedName }*
 
 W
-	= [a-zA-Z0-9_$]
+	= [A-Za-z0-9_$]
+
+LETTER
+	= [A-Za-z_]
 
 NAME
-	= !DIGIT !(KEYWORD !W) W+
+	= !KEYWORD LETTER W*
+
+/* Type */
+
+format #Tvoid[0]      `void`
+format #Tbyte[0]      `byte`
+format #Tshort[0]     `short`
+format #Tint[0]       `int`
+format #Tlong[0]      `long`
+format #Tfloat[0]     `float`
+format #Tdouble[0]    `double`
+
+format #Tarray[1]     `$[0][]`
+
+example ArrayType&Type int[]
+
+public Type
+	= ReferenceType    /* to accept int[] */
+	/ PrimitiveType
+
+ReferenceType
+	= ArrayType
+	/ ClassOrInterfaceType
+
+ArrayType
+	= (PrimitiveType / ClassOrInterfaceType ) {@ "[" "]" #Tarray }+
+
+ClassOrInterfaceType
+	= ClassType 
+	/ InterfaceType
+	
+ClassType
+	= QualifiedName
+
+InterfaceType
+	= ClassType
+
+public PrimitiveType
+	= NumericType
+	/ BooleanType
+
+NumericType
+	= IntegralType 
+	/ FloatingPointType
+
+IntegralType
+	= { "byte"    #Tbyte }
+	/ { "char"    #Tchar }
+	/ { "short"   #Tshort }
+	/ { "int"     #Tint }
+	/ { "long"    #Tlong }
+
+FloatingPointType
+	= { "float"   #Tfloat }
+	/ { "double"  #Tdouble }
+
+BooleanType
+	= { "boolean" #Tboolean }
+
+Void
+	= { "void"    #Tvoid }
+
+TypeOrVoid
+	= Type 
+	/ Void
+
+NonArrayType
+	= ClassOrInterfaceType 
+	/ PrimitiveType
+
+ClassOrInterfaceTypes
+	= { ( @ClassOrInterfaceType ("," @ClassOrInterfaceType)* )? #CommaList }
+
 
 /* Literal, Constant */
 
-format #Null[0] `null`
-format #True[0] `true`
-format #False[0] `false`
+format #Null[0]   `null`
+format #True[0]   `true`
+format #False[0]  `false`
 
 format #Integer[0] `${text}`
-format #Long[0] `${text}`
-//format #OctalInteger[0] `${text}`
-//format #HexInteger[0] `${text}`
-format #Float[0] `${text}`
-format #Double[0] `${text}`
+format #Long[0]    `${text}`
+format #Float[0]   `${text}`
+format #Double[0]  `${text}`
 
-format #String[0] `"${text}"`
+format #String[0]    `"${text}"`
 format #Character[0] `'${text}'`
-//format #RegExp[0] `${text}`
 
 Literal
 	= FloatingPointLiteral 
