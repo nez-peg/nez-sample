@@ -2,7 +2,8 @@
 //==========
 
 File
-  = { (__ @SourceFile)? __ #File }
+  = { __ (@DeclarationElement (__ @DeclarationElement)* __ EOF #DTSFile
+  / @ImplementationElement (__ @ImplementationElement)* __ EOF #TsFile)? }
 
   W
     = [a-zA-Z0-9_]
@@ -93,13 +94,6 @@ File
 //SourceFilesAndExternalModules
 //==========
 
-SourceFile
-  = DeclarationElements
-  / ImplementationElements
-
-  ImplementationElements
-    = { @ImplementationElement (__ @ImplementationElement)* #ImplementationElements }
-
     ImplementationElement
       = ModuleElement
       / ExportAssignment
@@ -115,9 +109,6 @@ SourceFile
 
         ExternalModuleReference
           = { "require" __ '(' __ @StringLiteral __ ')' #ExternalModuleReference }
-
-  DeclarationElements
-    = { @DeclarationElement (__ @DeclarationElement)* #DeclarationElements }
 
     DeclarationElement
       = ExportAssignment
@@ -485,12 +476,11 @@ Expression
         / { "new" __ @NewExpression #New }
 
       CallExpression
-        = MemberExpressionWithArgs {@ __ callOrMemberOperator }*
-        / { "super" __ '(' (__ @ArgumentList)? __ ')' #Super }
-        / { "super" __ '.' __ @IdentifierName #Super }
+        = "super" __ { ('(' (__ @ArgumentList)? __ ')' / '.' __ @IdentifierName)  #Super} {@ __ callOrMemberOperator}*
+        / MemberExpressionWithArgs {@ __ callOrMemberOperator }*
 
         MemberExpressionWithArgs
-          = MemberExpression __ arguments
+          = MemberExpression __ {@ arguments #Apply }
 
         callOrMemberOperator
           = '.' __ @IdentifierName #Field
@@ -511,24 +501,17 @@ Expression
             / '[' __ @Expression __ ']' #Index
 
           ReceiverExpression
-            = PrimaryExpression
+            = NewExpressionWithArgs
             / FunctionExpression
-            / NewExpressionWithArgs
+            / PrimaryExpression
 
             PrimaryExpression
               = { "this" #This }
-              / { @DefinitelyTyped #DefinitelyTyped }
               / Identifier
               / Literal
               / ArrayLiteral
               / ObjectLiteral
               / '(' __ Expression __ ')'
-
-              DefinitelyTyped
-                = TypeName @Method
-
-                Method
-                  = { '(' (__ @AssignmentExpression (__ ',' __ @AssignmentExpression)*)? __ ')' #Method }
 
               ArrayLiteral
                 = { '[' (__ elementList)? __ ']' #Array }
@@ -560,7 +543,7 @@ Expression
               = { "function" (__ @Identifier)? __ @CallSignature __ '{' __ @FunctionBody __ '}' #Function }
 
             NewExpressionWithArgs
-              = { "new" __ @MemberExpression __ arguments #New }
+              = { "new" __ @MemberExpression __ {@ arguments #Apply } #New }
 
     ConditionalExpression
       = LogicalORExpression {@ __ '?' __ @AssignmentExpression __ ':' __ @AssignmentExpression #Conditional }?
@@ -701,9 +684,9 @@ Literal
     / OctaIntegerLiteral
 
     DecimalLiteral
-      = { DECIMAL_INTEGER_LITERAL #Integer }
-      / { DECIMAL_INTEGER_LITERAL? '.' DECIMAL_DIGITS EXPONENT_PART? #Double }
+      = { DECIMAL_INTEGER_LITERAL? '.' DECIMAL_DIGITS EXPONENT_PART? #Double }
       / { DECIMAL_INTEGER_LITERAL EXPONENT_PART #Double }
+      / { DECIMAL_INTEGER_LITERAL #Integer }
 
       DECIMAL_INTEGER_LITERAL
         = '0'
