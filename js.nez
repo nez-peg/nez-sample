@@ -141,6 +141,7 @@ SourceElement
     = Statement
 /* FIXME   / FunctionDeclaration */
 
+format #Source[*] `$[0 `${NL}` -1]` 
 format #FuncDecl[2] `function $[0] $[1]`
 format #FuncDecl[3] `function $[0] $[1] $[2]`
 
@@ -164,7 +165,8 @@ FunctionBody
 
 /*Statement*/
 
-format #Block[*]        `{${inc}${NL}$[0 `${NL}` -1]${dec}}`
+format #Block[0]        `{}`
+format #Block[*]        `{${inc}${NL}$[0 `${NL}` -1]${dec}${NL}}`
 format #Empty[0]        `;`
 format #VarDeclStmt[1]  `var $[0];`
 format #VarDecl[1]      `$[0]`
