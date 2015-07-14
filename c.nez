@@ -1,7 +1,7 @@
 // Nez C Grammar
 // ===============
 //
-// Based on grammar from ISO/IEC 9899:2011 [1]. 
+// Based on grammar from ISO/IEC 9899:2011 [1].
 //
 // Limitations:
 //
@@ -23,7 +23,7 @@ export
 	/ CChar
 
 File
-	= _ { ( @TopLevel / _ )* #Source } EOT
+	= _ { ( @TopLevel / __ )* #Source } EOT
 
 Chunk
 	= TopLevel
@@ -32,6 +32,9 @@ Chunk
 	/ Type
 _
 	= (S / BLOCKCOMMENT / LINECOMMENT / ATTRIBUTE)*
+
+__
+	= (S / BLOCKCOMMENT / LINECOMMENT / ATTRIBUTE)+
 
 S
 	= [ \n\r\t\u000B\u000C]
@@ -73,18 +76,18 @@ HEX4
 	= HEX HEX HEX HEX
 
 Name
-	= { NAME #Name } _ 
+	= { NAME #Name } _
 
 NAME
 	= !DIGIT !(KEYWORD !W) W+
 
 KEYWORD
-	= 'auto' / 'break' / 'case' / 'char' / 'const' / 'continue' / 'default' 
-	/ 'double' / 'do' / 'else' / 'enum' / 'extern' / 'float' / 'for' 
-	/ 'goto' / 'if' / 'int' / 'inline' / 'long' / 'register' / 'restrict' 
-	/ 'return' / 'short' / 'signed' / 'sizeof' / 'static' / 'struct' 
-	/ 'switch' / 'typedef' / 'union' / 'unsigned' / 'void' / 'volatile' 
-	/ 'while' / '_Bool' / '_Complex' / '_Imaginary' / '_stdcall' 
+	= 'auto' / 'break' / 'case' / 'char' / 'const' / 'continue' / 'default'
+	/ 'double' / 'do' / 'else' / 'enum' / 'extern' / 'float' / 'for'
+	/ 'goto' / 'if' / 'int' / 'inline' / 'long' / 'register' / 'restrict'
+	/ 'return' / 'short' / 'signed' / 'sizeof' / 'static' / 'struct'
+	/ 'switch' / 'typedef' / 'union' / 'unsigned' / 'void' / 'volatile'
+	/ 'while' / '_Bool' / '_Complex' / '_Imaginary' / '_stdcall'
 	/ '__declspec' / '__attribute__' / '__asm'
 
 "++"     = '++' _
@@ -104,6 +107,7 @@ KEYWORD
 "double"    = 'double'   !W
 "signed"    = 'signed'   !W
 "unsigned"  = 'unsigned' !W
+"__signed"  = '__signed' !W
 "_Bool"      = '_Bool'    !W
 "_Complex"   = '_Complex' !W
 "struct"    = 'struct'   !W
@@ -169,6 +173,7 @@ KEYWORD
 "volatile"	= 'volatile' !W _
 "__declspec"	= '__declspec' !W _
 "inline"	= 'inline' !W _
+"__inline" = '__inline' !W _
 "_stdcall"	= '_stdcall' !W _
 
 "("	= '(' _
@@ -189,7 +194,7 @@ TopLevel
 	/ { #Empty } ";"
 
 ExternBlock
-	= _ { "extern" _ "\"C\"" _ "{" ( @TopLevel / _ )*  "}" #Source } _
+	= _ { "extern" _ '\"C\"' _ "{" ( @TopLevel / __ )*  "}" #Source } _
 
 Declaration
 	= FunctionDeclaration
@@ -222,12 +227,12 @@ Annotation
 	/ "_stdcall"  { #KeyValue @{`stdcall` #Key } @{`true` #Value } } _
 
 FunctionParamList
-	= { ( @FunctionParam ("," @FunctionParam)* )? ("," "...")? #List } 
+	= { ( @FunctionParam ("," @FunctionParam)* )? ("," "...")? #List }
 	/ { _ 'void' _ #List }
 
 FunctionParam
 	= { @Type _ (@VarName)? #Param} _
-	
+
 // Declaration
 //==============
 
@@ -255,14 +260,14 @@ VarName
 
 Initializer
 	= AssignmentExpression
-	/ "{" { (addInitializerList)* ","? #Initializer } "}"
+	/ "{" { addInitializerList ","? #Initializer } "}"
 
 addInitializerList
 	= (@Designation / @Initializer)? ("," (@Designation / @Initializer))*
 
 Designation
 	= { (@Designator)+ "=" @Initializer  #Designation }
-	
+
 Designator
 	= "[" ConstantExpression "]"
 	/ "." Name _
@@ -307,9 +312,9 @@ PrimaryType
 	/ { "unsigned" `unsigned int` #TInt } _
 	/ { "_Bool" #TBoolean } _
 	/ { "_Complex" #TComplex } _
-	/ { "__builtin_va_list" #TName } _
+	/ { '__builtin_va_list' #TName } _
 	/ { <isa TypeName> #TTypedef } _
-	/ { "node_type_t" #TName } _
+	/ { 'node_type_t' #TName } _
 	/ { NAME   #Name } _
 
 StructDeclaration
@@ -325,9 +330,9 @@ CONST
 
 NAME_T
 	= !DIGIT (!('_t' !W)  W )+ '_t' !W
-	
+
 addStructMember
-	= '{' _ (@Directive / @StructMemberDeclaration / _ )* _ "}"
+	= '{' _ (@Directive / @StructMemberDeclaration / __ )* _ "}"
 
 StructMemberDeclaration
 	= { @AnnotationList @Type @StructMemberName  ("," @StructMemberName )* ";" _ #StructMemberDeclaration }
@@ -348,7 +353,7 @@ Enumerator
 //===================
 
 Block
-	= { "{" (@Directive /  @Statement / @Declaration / _ )* "}" #Block }
+	= { "{" (@Directive /  @Statement / @Declaration / __ )* "}" #Block }
 
 Statement
 	= Block
@@ -389,12 +394,12 @@ addAssignmentOperator
 	/ "<<="    #AssignLeftShift
 	/ ">>="   #AssignRightShift
 	/ "&="     #AssignBitwiseAnd
-	/ "^="     #AssignBitwiseXOr 
+	/ "^="     #AssignBitwiseXOr
 	/ "|="      #AssignBitwiseOr
 
 ConstantExpression
 	= ConditionalExpression
-	
+
 ConditionalExpression
 	= LogicalORExpression {@ "?"  @Expression ":" @LogicalORExpression #Trinary }*
 
@@ -445,7 +450,7 @@ CastExpression
 	/ UnaryExpression
 
 PostfixExpression
-	= ( PrimaryExpression / { "(" @Type ")" "{" @{ (addInitializerList)* ","? #Initializer } "}" } ) 
+	= ( PrimaryExpression / { "(" @Type ")" "{" @{ addInitializerList ","? #Initializer } "}" } )
 	{@ (addFunctionCall / addPointerField / addIndex / addField / addInc / addDec) }*
 
 addFunctionCall
@@ -542,7 +547,7 @@ CString
 	=  'L'? ('"' { STRING_CONTENT* #String } '"' _)+
 
 CChar
-	= 'L'? "'" { CHAR_CONTENT* #Character } "'" _
+	= 'L'? '\'' { CHAR_CONTENT* #Character } '\'' _
 
 STRING_CONTENT
 	= ESCAPE
@@ -560,9 +565,9 @@ ESCAPE
 
 SIMPLE_ESCAPE
 	= '\\' ['\"?\\abfnrtv]
-	
+
 OCTAL_ESCAPE
 	= '\\' [0-7] [0-7]? [0-7]?
-	
+
 HEX_ESCAPE
 	= '\\x' HEX+
