@@ -133,7 +133,7 @@ KEYWORD
 "&&"	= '&&' _
 "||"	= '||' _
 "?"	= '?' _
-";"	= (';' _ / EOL)  /* this is for debug */
+";"	= (';' _)  /* this is for debug */
 "}"	= '}' _
 "->"	= '->' _
 "enum"	= 'enum' !W
