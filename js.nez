@@ -141,6 +141,10 @@ SourceElement
     = Statement
 /* FIXME   / FunctionDeclaration */
 
+format #Source[*] `$[0 `${NL}` -1]` 
+format #FuncDecl[2] `function $[0] $[1]`
+format #FuncDecl[3] `function $[0] $[1] $[2]`
+
 example FunctionDeclaration&SourceElement function func(){}
 example FunctionDeclaration&SourceElement function func(n) { return n+1; }
 
@@ -161,15 +165,16 @@ FunctionBody
 
 /*Statement*/
 
-format #Block[*]        `{${inc}${NL}$[0 `${NL}` -1]${dec}}`
+format #Block[0]        `{}`
+format #Block[*]        `{${inc}${NL}$[0 `${NL}` -1]${dec}${NL}}`
 format #Empty[0]        `;`
 format #VarDeclStmt[1]  `var $[0];`
 format #VarDecl[1]      `$[0]`
 format #VarDecl[2]      `$[0] = $[1]`
 format #If[2]           `if ($[0]) $[1]`
-format #If[3]           `if ($[0]) $[1]{$NL}else $[2]`
+format #If[3]           `if ($[0]) $[1]${NL}else $[2]`
 format #While[2]        `while ($[0]) $[1]`
-format #DoWhile[2]      `do $[1]{$NL}while ($[0])`
+format #DoWhile[2]      `do $[1]${NL}while ($[0])`
 format #For[4]          `for ($[0]; $[1]; $[2]) $[3]`
 format #ForVar[4]       `for (var $[0]; $[1]; $[2]) $[3]`
 format #ForEach[3]      `for ($[0] in $[1]) $[2]`
@@ -405,6 +410,7 @@ format #SuffixDec[1] `$[0]--`
 /* Primary */
 
 format #This[0] `this`
+format #Apply[2] `$[0]$[1]`
 format #Field[2] `$[0].$[1]`
 format #Index[2] `$[0][$[1]]`
 format #List[*] `($[0 `, ` -1])`
