@@ -23,10 +23,10 @@ SPACE
 
 LINE_TERMINATOR_SEQUENCE
     = '\n' / '\r\n' / '\r'
-    
+
 LINE_TERMINATOR
     = [\n\r\u2028\u2029]
-    
+
 COMMENT
     = MULTI_LINE_COMMENT / SINGLE_LINE_COMMENT
 
@@ -231,6 +231,7 @@ example VariableStatement&Statement var a = 0, b, c = 1 + 3;
 example ExpressionStatement&Statement (function(){})();
 example ExpressionStatement&Statement !(function(){})();
 example IfStatement&Statement  if(c){;}
+example IfStatement&Statement  if(c){;}else if(c){;}else{;}
 example DoWhileStatement&Statement do{;}while(c)
 example WhileStatement&Statement while(c){;}
 
@@ -319,7 +320,7 @@ CaseClause
 /* Labeled Statement */
 
 example LabelStatement&Statement '''
-label: 
+label:
 var a = 1;
 '''
 
@@ -425,7 +426,7 @@ inline addAssignmentOperator
     / '<<=' #AssignLeftShift
     / '>>' ('=' #AssignRightShift / '>=' #AssignLogicalRightShift)
     / '&='  #AssignBitwiseAnd
-    / '^='  #AssignBitwiseXOr 
+    / '^='  #AssignBitwiseXOr
     / '|='  #AssignBitwiseOr
 
 ConditionalExpression
@@ -466,7 +467,7 @@ ShiftExpression
     = <on InOperator AdditiveExpression {@ __ addShiftOperator __ @AdditiveExpression }* >
 
 inline addShiftOperator
-    = "<<" #LeftShift 
+    = "<<" #LeftShift
     / '>>' ('>' #LogicalRightShift / !'=' #RightShift)
 
 AdditiveExpression
@@ -474,6 +475,8 @@ AdditiveExpression
 
 MultiplicativeExpression
     = UnaryExpression {@ __ ( "*" #Mul / "/" #Div / "%" #Mod ) __ @UnaryExpression }*
+
+// delete ( NewExpression / CallExpression ) addPostfixOperator
 
 public UnaryExpression
     = PostfixExpression / { addUnaryOperator __ @UnaryExpression }
@@ -529,8 +532,8 @@ inline addMemberOperator
 
 /** FIXME
 ReceiverExpression
-    = PrimaryExpression 
-    / FunctionExpression 
+    = PrimaryExpression
+    / FunctionExpression
     / NewExpressionWithArgs
 **/
 
@@ -551,6 +554,8 @@ public PrimaryExpression
     / NewExpressionWithArgs
     / Identifier
 
+example ThisExpression&Expression this
+
 public ThisExpression
     = { "this" #This }
 
@@ -561,8 +566,13 @@ NewExpressionWithArgs
 
 format #Array[*] `[$[0 `, ` -1]]`
 
+example ArrayLiteral&Expression []
+example ArrayLiteral&Expression [1,2]
+example ArrayLiteral&Expression [, ,,]
+example ArrayLiteral&Expression [,"hoge", ,1,, ,true,,]
+
 public ArrayLiteral
-    = {'[' __ ( (addElisionList __)? ']'  
+    = {'[' __ ( (addElisionList __)? ']'
        / addElementList addArrayDelimitor? __ ']' ) #Array }
 
 inline addArrayDelimitor
@@ -583,7 +593,7 @@ format #Object[*] `{$[0 `, ` -1]}`
 format #Property[2] `$[0]: $[1]`
 format #GetterProperty[2] `get $[0]() $[1]`
 format #SetterProperty[3] `set $[0]($[1]) $[2]`
- 
+
 example ObjectLiteral&Expression {}
 example ObjectLiteral&Expression {a: 1, b: 2}
 example ObjectLiteral&Expression '''
@@ -719,14 +729,19 @@ format #Character[0] `'${text}'`
 format #RegExp[0] `${text}`
 
 public Literal
-    = NullLiteral 
-    / BooleanLiteral 
-    / NumericLiteral 
-    / StringLiteral 
+    = NullLiteral
+    / BooleanLiteral
+    / NumericLiteral
+    / StringLiteral
     / RegularExpressionLiteral
+
+example NullLiteral&Expression null
 
 public NullLiteral
     = { "null" #Null }
+
+example BooleanLiteral&Expression true
+example BooleanLiteral&Expression false
 
 public BooleanLiteral
     = { "true" #True }
@@ -738,19 +753,19 @@ example NumericLiteral&Expression 0.12
 example NumericLiteral&Expression 1234
 
 public NumericLiteral
-    = HexIntegerLiteral 
-    / FloatingPointLiteral 
-    / OctaIntegerLiteral 
+    = HexIntegerLiteral
+    / FloatingPointLiteral
+    / OctaIntegerLiteral
     / DecimalIntegerLiteral
 
 DecimalIntegerLiteral
     = { DECIMAL_INTEGER #Integer }
 
 OctaIntegerLiteral
-    = { '0' OCT* #OctalInteger }
+    = '0' { OCT* #OctalInteger }
 
 HexIntegerLiteral
-    = { '0' [xX] HEX* #HexInteger }
+    = '0' [xX] { HEX* #HexInteger }
 
 FloatingPointLiteral
     = { DECIMAL_INTEGER? '.' DIGIT+ EXPONENT_PART? #Double }
@@ -767,6 +782,9 @@ OCT
 
 SIGN
     = ( '+' / '-' )
+
+example StringLiteral&Expression "hoge\\\"\'\b\f\n\r\t\v\012\x1F\X5d\u00A0\u094F\n\r\n\r\A"
+example StringLiteral&Expression 'hoge\\\"\'\b\f\n\r\t\v\012\x1F\X5d\u00A0\u094F\n\r\n\r\A'
 
 public StringLiteral
     = ["] { DOUBLE_STRING_CHARACTER* #String } ["]
