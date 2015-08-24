@@ -768,10 +768,11 @@ DecimalIntegerLiteral
     = { DECIMAL_INTEGER #Integer }
 
 OctaIntegerLiteral
-    = '0' { OCT* #OctalInteger }
+    = '0' { OCT+ #OctalInteger }
+    / { '0' #Integer }
 
 HexIntegerLiteral
-    = '0' [xX] { HEX* #HexInteger }
+    = '0' [xX] { HEX+ #HexInteger }
 
 FloatingPointLiteral
     = { DECIMAL_INTEGER? '.' DIGIT+ EXPONENT_PART? #Double }
